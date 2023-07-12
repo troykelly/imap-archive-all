@@ -13,11 +13,13 @@
     "build": "tsc"
   },
   "dependencies": {
+    "cli-progress": "^3.12.0",
     "imapflow": "^1.0.133",
     "moment": "^2.29.4",
     "pino": "^8.14.1"
   },
   "devDependencies": {
+    "@types/cli-progress": "^3.11.0",
     "@types/imapflow": "^1.0.13",
     "@types/moment": "^2.13.0",
     "@types/node": "^20.4.1",
