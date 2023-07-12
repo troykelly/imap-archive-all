@@ -104,7 +104,7 @@ async function moveEmailsToArchive(connection: ImapFlow, emails: number[], batch
         DISABLE_PROGRESS_BAR && console.log("📤 Moving emails in batch starting at index:", index);
         try {
             await connection.messageMove(batch, "Archive");
-            !DISABLE_PROGRESS_BAR && console.log(`✅ Batch starting from index ${index} moved successfully.`);
+            DISABLE_PROGRESS_BAR && console.log(`✅ Batch starting from index ${index} moved successfully.`);
             index += BATCH_SIZE;
         } catch (err) {
             console.error("❌ Error moving batch:", err);
@@ -131,15 +131,15 @@ async function main() {
     let totalEmailsMoved = 0;
     let estimatedTotalEmails = 0;
 
-    !DISABLE_PROGRESS_BAR && console.log("🚀 Starting IMAP Archiver...");
+    DISABLE_PROGRESS_BAR && console.log("🚀 Starting IMAP Archiver...");
 
     try {
         const oneWeekAgo: Date = moment().subtract(1, 'weeks').startOf('day').toDate();
 
         await client.connect();
-        !DISABLE_PROGRESS_BAR && console.log("🔗 Connected to IMAP server.");
+        DISABLE_PROGRESS_BAR && console.log("🔗 Connected to IMAP server.");
         await client.mailboxOpen("INBOX");
-        !DISABLE_PROGRESS_BAR && console.log("📬 Opened INBOX.");
+        DISABLE_PROGRESS_BAR && console.log("📬 Opened INBOX.");
 
         // Get the estimated total number of emails that will be moved
         const mailboxStatus = await client.status("INBOX", { messages: true });
@@ -160,12 +160,12 @@ async function main() {
         }
 
         !DISABLE_PROGRESS_BAR && totalProgressBar.stop();
-        !DISABLE_PROGRESS_BAR && console.log(`🎉 Successfully moved ${totalEmailsMoved} old emails!`);
+        DISABLE_PROGRESS_BAR && console.log(`🎉 Successfully moved ${totalEmailsMoved} old emails!`);
     } catch (err) {
         console.error("❌ Error during the process:", err);
     } finally {
         await client.logout();
-        !DISABLE_PROGRESS_BAR && console.log("👋 Logged out of the IMAP server, bye!");
+        DISABLE_PROGRESS_BAR && console.log("👋 Logged out of the IMAP server, bye!");
     }
 }
 
