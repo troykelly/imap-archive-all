@@ -1,0 +1,28 @@
+{
+  "name": "imap-archive-all",
+  "version": "0.0.1",
+  "description": "Archives all your email",
+  "main": "main.js",
+  "repository": "https://github.com/troykelly/imap-archive-all.git",
+  "author": "Troy Kelly <troy@troykelly.com>",
+  "license": "Apache-2.0",
+  "private": false,
+  "scripts": {
+    "start": "node main.js",
+    "dev": "ts-node-dev --respawn --transpile-only src/main.ts",
+    "build": "tsc"
+  },
+  "dependencies": {
+    "imapflow": "^1.0.133",
+    "moment": "^2.29.4",
+    "pino": "^8.14.1"
+  },
+  "devDependencies": {
+    "@types/imapflow": "^1.0.13",
+    "@types/moment": "^2.13.0",
+    "@types/node": "^20.4.1",
+    "@types/pino": "^7.0.5",
+    "ts-node-dev": "^2.0.0",
+    "typescript": "^5.1.6"
+  }
+}

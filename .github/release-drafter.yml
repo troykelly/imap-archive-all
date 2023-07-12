@@ -1,0 +1,16 @@
+# .github/release-drafter.yml
+
+name-template: 'v$NEXT_PATCH_VERSION'
+tag-template: 'v$NEXT_PATCH_VERSION'
+categories:
+  - title: ':boom: Breaking Change'
+    labels:
+      - 'major'
+  - title: ':rocket: New Feature'
+    labels:
+      - 'minor'
+  - title: ':bug: Bug Fix'
+    labels:
+      - 'patch'
+
+incrementing: 'false'
