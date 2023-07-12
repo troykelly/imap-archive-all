@@ -1,10 +1,12 @@
 # IMAP Archive All
 
-A simple utility script that automatically archives all your emails received before the previous week from your IMAP inbox to the IMAP Archive folder. The script is written in TypeScript and uses the [ImapFlow](https://imapflow.com/) library for connecting to IMAP servers.
+A simple utility script that automatically archives all your emails received before the previous week from your IMAP inbox to the IMAP Archive folder. The script is written in TypeScript and uses the [ImapFlow](https://imapflow.com/) library for connecting to IMAP servers. It provides flexibility in specifying the batch size and timeouts to cater to a wide range of server configurations and performance constraints.
 
 ## Why
 
-[Proton Mail](https://protonmail.com/) is notable for its focus on security and privacy. However, managing a substantial mailbox (>10,000 emails) can be challenging due to the lack of 'archive all' or 'mark all read' features. With a mailbox containing more than 300,000 emails, Android clients may experience difficulty sending emails or saving drafts. This script will move all Inbox emails to Archive, potentially improving your Proton Mail client's performance.
+[Proton Mail](https://protonmail.com/) is notable for its focus on security and privacy. However, managing a substantial mailbox (>10,000 emails) can be challenging due to the lack of 'archive all' or 'mark all read' features. With a mailbox containing more than 300,000 emails, Android clients may experience difficulty sending emails or saving drafts.
+
+This script helps by moving all Inbox emails to Archive in controlled batches to avoid overwhelming your mailbox. This potentially improves your Proton Mail client's performance. The size of the batches and the interval between them can be adjusted to best match your server's capabilities.
 
 ## Proton Mail Bridge
 
@@ -43,8 +45,14 @@ export IMAP_USERNAME=my@email.com
 export IMAP_PASSWORD=secretpassword
 export IMAP_HOST=127.0.0.1
 export IMAP_PORT=1143
-export IMAP_SECURITY=STARTTLS // or 'SSL/TLS'
+export IMAP_SECURITY=STARTTLS // Or 'SSL/TLS'
+export IMAP_BATCH_SIZE=500 // The number of emails fetched/moved in one batch. Default is 500.
+export IMAP_CONNECTION_TIMEOUT=90000 // Milliseconds waiting for the connection to establish. Default is 90000 (90 seconds).
+export IMAP_GREETING_TIMEOUT=16000 // Milliseconds waiting for the greeting after the connection is established. Default is 16000 (16 seconds).
+export IMAP_SOCKET_TIMEOUT=300000 // Milliseconds of inactivity to allow. Default is 300000 (5 minutes).
 ```
+
+Be aware that `IMAP_USERNAME` and `IMAP_PASSWORD` are sensitive pieces of information. Handle them with care; don't hard-code them into your scripts or expose them in your shell's history. Consider storing these values securely or use tools to handle them safely (like encrypted environment variables).
 
 #### Additionally, you can set `IMAP_DEBUG=true` in your environment variables to enable debugging logs.
 
@@ -78,9 +86,14 @@ docker run --rm -it \
   -e IMAP_HOST=host.docker.internal \
   -e IMAP_PORT=1143 \
   -e IMAP_SECURITY=STARTTLS \
+  -e IMAP_BATCH_SIZE=500 \
+  -e IMAP_CONNECTION_TIMEOUT=90000 \
+  -e IMAP_GREETING_TIMEOUT=16000 \
+  -e IMAP_SOCKET_TIMEOUT=300000 \
   ghcr.io/troykelly/imap-archive-all:latest
 ```
-Remember to replace `my@email.com` and `secretpassword` with the Proton Mail Bridge credentials.
+
+Remember to replace `my@email.com` and `secretpassword` with your Proton Mail Bridge credentials.
 
 ## Development
 

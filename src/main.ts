@@ -1,10 +1,9 @@
 import { ImapFlow, ImapFlowOptions } from "imapflow";
 import moment from "moment";
 
-/** Defines the batch size for processing emails. */
-const BATCH_SIZE = 500;
-
-/** Contains environment variables for an IMAP account. */
+/**
+ * Contains environment variables for an IMAP account
+ */
 interface Env {
     IMAP_USERNAME: string;
     IMAP_PASSWORD: string;
@@ -12,14 +11,19 @@ interface Env {
     IMAP_PORT: string;
     IMAP_SECURITY: string;
     IMAP_DEBUG: string;
+    IMAP_BATCH_SIZE: string;
+    IMAP_CONNECTION_TIMEOUT: string;
+    IMAP_GREETING_TIMEOUT: string;
+    IMAP_SOCKET_TIMEOUT: string;
 }
 
-/** Stores environment variables provided in the current running process */
-const env: Env = process.env as any;
-
 /**
- * Configuration interface for an IMAP server.
+ * Stores environment variables provided in the current running process
  */
+const env: Env = process.env as any;
+/** Defines the batch size for processing emails. The user is allowed to set this value by providing the IMAP_BATCH_SIZE environment variable. */
+const BATCH_SIZE = Number(env.IMAP_BATCH_SIZE) || 500;
+
 interface ImapConfig {
     host: string;
     port: number;
@@ -32,20 +36,38 @@ interface ImapConfig {
         rejectUnauthorized: boolean;
         minVersion: string;
     };
+    logger: {
+        error: (message: string) => void;
+        warn: (message: string) => void;
+        info: (message: string) => void;
+        debug: (message: string) => void;
+    };
+    emitLogs: boolean;
+    connectionTimeout: number;
+    greetingTimeout: number;
+    socketTimeout: number;
 }
 
 /**
- * Returns the IMAP configuration for the email server.
- * @returns The IMAP configuration object.
+ * Enhances ImapFlowOptions with timeout settings
  */
-function getImapConfiguration(): ImapFlowOptions {
+interface CustomImapFlowOptions extends ImapFlowOptions {
+    connectionTimeout?: number;
+    greetingTimeout?: number;
+    socketTimeout?: number;
+}
+
+/**
+ * Returns the IMAP configuration for the email server
+ * @returns The IMAP configuration object
+ */
+function getImapConfiguration(): CustomImapFlowOptions {
     const logger = {
         error: console.error,
         warn: console.warn,
         info: env.IMAP_DEBUG ? console.info : () => { },
         debug: env.IMAP_DEBUG ? console.debug : () => { }
     };
-
     return {
         host: env.IMAP_HOST || "127.0.0.1",
         port: Number(env.IMAP_PORT || "1143"),
@@ -60,18 +82,20 @@ function getImapConfiguration(): ImapFlowOptions {
         },
         logger,
         emitLogs: false,
+        connectionTimeout: Number(env.IMAP_CONNECTION_TIMEOUT) || 90000,
+        greetingTimeout: Number(env.IMAP_GREETING_TIMEOUT) || 16000,
+        socketTimeout: Number(env.IMAP_SOCKET_TIMEOUT) || 300000,
     };
 }
 
 /**
- * Fetches emails older than one week in batches.
- * @param connection The client used to connect to the IMAP server. 
- * @returns A promise that resolves to an array of email IDs.
+ * Fetches emails older than one week in batches
+ * @param connection The client used to connect to the IMAP server
+ * @returns A promise that resolves to an array of email IDs
  */
-async function fetchEmails(connection: ImapFlow): Promise<number[]> {
+async function fetchEmails(connection: ImapFlow, startSeq: number = 1): Promise<number[]> {
     const oneWeekAgo: Date = moment().subtract(1, 'weeks').startOf('day').toDate();
-    const searchCriteria: unknown = { before: oneWeekAgo };
-
+    const searchCriteria: unknown = { before: oneWeekAgo, seq: `${startSeq}:${startSeq + BATCH_SIZE - 1}` };
     console.log("💭 Fetching emails received before", oneWeekAgo);
     const messages: number[] = await connection.search(searchCriteria);
     console.log("💌 No. of emails fetched:", messages.length);
@@ -79,14 +103,33 @@ async function fetchEmails(connection: ImapFlow): Promise<number[]> {
 }
 
 /**
- * Moves emails to the Archive folder in batches.
- * @param connection The client used to connect to the IMAP server.
- * @param emails An array containing the IDs of the emails to be moved.
- * @returns A promise that resolves when all emails have been moved.
+ * Fetches all old emails in batches and returns them
+ * @param connection The client used to connect to the IMAP server 
+ * @returns A promise that resolves to an array of email IDs
+ */
+async function fetchAllOldEmails(client: ImapFlow): Promise<number[]> {
+    let startSeq = 1;
+    let allEmails: number[] = [];
+
+    while (true) {
+        const emails = await fetchEmails(client, startSeq);
+        allEmails = allEmails.concat(emails);
+        if (emails.length < BATCH_SIZE) {
+            break;
+        }
+        startSeq += BATCH_SIZE;
+    }
+    return allEmails;
+}
+
+/**
+ * Moves emails to the Archive folder
+ * @param connection The client used to connect to the IMAP server
+ * @param emails An array containing the IDs of the emails to be moved
+ * @returns A promise that resolves when all emails have been moved
  */
 async function moveEmailsToArchive(connection: ImapFlow, emails: number[]): Promise<void> {
     let index = 0;
-    // Check if "Archive" mailbox exists
     const mailboxes = await connection.list();
     const archiveExists = mailboxes.some(mailbox => mailbox.path.toLowerCase() === "archive");
 
@@ -109,10 +152,10 @@ async function moveEmailsToArchive(connection: ImapFlow, emails: number[]): Prom
 }
 
 /**
- * Main function that connects to an IMAP server, fetches and moves old emails to Archive.
+ * Main function that connects to IMAP server, fetches and moves old emails to Archive
  */
 async function main() {
-    const config: ImapFlowOptions = getImapConfiguration();
+    const config: CustomImapFlowOptions = getImapConfiguration();
     const client = new ImapFlow(config);
 
     console.log("🚀 Starting IMAP Archiver...");
@@ -122,7 +165,7 @@ async function main() {
         console.log("🔗 Connected to IMAP server.");
         await client.mailboxOpen("INBOX");
         console.log("📬 Opened INBOX.");
-        const emails = await fetchEmails(client);
+        const emails = await fetchAllOldEmails(client);
         if (emails.length) {
             await moveEmailsToArchive(client, emails);
             console.log("🎉 Successfully moved all old emails to Archive!");
@@ -139,5 +182,5 @@ async function main() {
 
 main().catch(err => {
     console.error(err);
-    process.exit(1); // Handle unhandled promise rejections
+    process.exit(1);
 });
