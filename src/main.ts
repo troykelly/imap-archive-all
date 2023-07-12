@@ -17,7 +17,9 @@ interface Env {
 /** Stores environment variables provided in the current running process */
 const env: Env = process.env as any;
 
-/** Configuration interface for an IMAP server. */
+/**
+ * Configuration interface for an IMAP server.
+ */
 interface ImapConfig {
     host: string;
     port: number;
@@ -37,22 +39,16 @@ interface ImapConfig {
  * @returns The IMAP configuration object.
  */
 function getImapConfiguration(): ImapFlowOptions {
-    const logger = env.IMAP_DEBUG
-        ? {
-            error: console.error,
-            warn: console.warn,
-            info: console.info,
-            debug: console.debug
-        } : {
-            error: console.error,
-            warn: console.warn,
-            info: () => { },  // Change this
-            debug: () => { }  // Change this
-        };
+    const logger = {
+        error: console.error,
+        warn: console.warn,
+        info: env.IMAP_DEBUG ? console.info : () => { },
+        debug: env.IMAP_DEBUG ? console.debug : () => { }
+    };
 
     return {
         host: env.IMAP_HOST || "127.0.0.1",
-        port: +(env.IMAP_PORT || "1143"),
+        port: Number(env.IMAP_PORT || "1143"),
         secure: (env.IMAP_SECURITY || "STARTTLS").toUpperCase() !== "STARTTLS",
         auth: {
             user: env.IMAP_USERNAME,
@@ -74,7 +70,7 @@ function getImapConfiguration(): ImapFlowOptions {
  */
 async function fetchEmails(connection: ImapFlow): Promise<number[]> {
     const oneWeekAgo: Date = moment().subtract(1, 'weeks').startOf('day').toDate();
-    const searchCriteria: any = { before: oneWeekAgo };
+    const searchCriteria: unknown = { before: oneWeekAgo };
 
     console.log("💭 Fetching emails received before", oneWeekAgo);
     const messages: number[] = await connection.search(searchCriteria);
@@ -90,12 +86,25 @@ async function fetchEmails(connection: ImapFlow): Promise<number[]> {
  */
 async function moveEmailsToArchive(connection: ImapFlow, emails: number[]): Promise<void> {
     let index = 0;
+    // Check if "Archive" mailbox exists
+    const mailboxes = await connection.list();
+    const archiveExists = mailboxes.some(mailbox => mailbox.path.toLowerCase() === "archive");
+
+    if (!archiveExists) {
+        console.error("❌ 'Archive' mailbox does not exist.");
+        return;
+    }
+
     while (index < emails.length) {
         const batch = emails.slice(index, index + BATCH_SIZE);
-        console.log("📤 Moving emails batch starting at index:", index);
-        await connection.messageMove(batch, "Archive");
-        index += BATCH_SIZE;
-        console.log(`✅ Batch starting from index ${index} moved successfully to Archive.`);
+        console.log("📤 Moving emails in batch starting at index:", index);
+        try {
+            await connection.messageMove(batch, "Archive");
+            console.log(`✅ Batch starting from index ${index} moved successfully to Archive.`);
+            index += BATCH_SIZE;
+        } catch (err) {
+            console.error("❌ Error moving batch to Archive:", err);
+        }
     }
 }
 
@@ -104,7 +113,6 @@ async function moveEmailsToArchive(connection: ImapFlow, emails: number[]): Prom
  */
 async function main() {
     const config: ImapFlowOptions = getImapConfiguration();
-
     const client = new ImapFlow(config);
 
     console.log("🚀 Starting IMAP Archiver...");
@@ -121,10 +129,15 @@ async function main() {
         } else {
             console.log("🎉 No old emails found to move. Done!");
         }
+    } catch (err) {
+        console.error("❌ Error during the process:", err);
     } finally {
         await client.logout();
         console.log("👋 Logged out of the IMAP server, bye!");
     }
 }
 
-main().catch(console.error);
+main().catch(err => {
+    console.error(err);
+    process.exit(1); // Handle unhandled promise rejections
+});
